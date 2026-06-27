@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Vulnerabilities - VulnVision{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>Vulnerabilities</h1>
+        <span class="text-secondary">{{ vulnerabilities|length }} findings detected</span>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <select id="filterSeverity" class="form-select" onchange="filterVulns()">
+        <option value="">All Severities</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+        <option value="info">Info</option>
+    </select>
+    <select id="filterStatus" class="form-select" onchange="filterVulns()">
+        <option value="">All Statuses</option>
+        <option value="open">Open</option>
+        <option value="resolved">Resolved</option>
+        <option value="accepted">Accepted</option>
+        <option value="false_positive">False Positive</option>
+    </select>
+    <input type="text" id="filterSearch" class="form-input" placeholder="Search vulnerabilities..." oninput="filterVulns()">
+</div>
+
+<div class="severity-bar" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+    {% set sev_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0} %}
+    {% for v in vulnerabilities %}{% if v.severity in sev_counts %}{% if sev_counts.update({v.severity: sev_counts[v.severity] + 1}) %}{% endif %}{% endif %}{% endfor %}
+    {% for sev in ['critical', 'high', 'medium', 'low', 'info'] %}
+    <div class="stat-card-mini">
+        <span class="badge badge-{{ sev }}">{{ sev|title }}</span>
+        <span class="stat-count">{{ sev_counts[sev] }}</span>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="data-table" id="vulnTable">
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>CVSS</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vuln in vulnerabilities %}
+                <tr data-severity="{{ vuln.severity }}" data-status="{{ vuln.status }}" data-title="{{ vuln.title|lower }}">
+                    <td><span class="badge badge-{{ vuln.severity }}">{{ vuln.severity }}</span></td>
+                    <td>{{ vuln.title }}</td>
+                    <td><span class="text-secondary">{{ vuln.category }}</span></td>
+                    <td>{{ '%.1f'|format(vuln.cvss_score or 0) }}</td>
+                    <td>{{ vuln.confidence }}%</td>
+                    <td><span class="badge badge-{{ 'success' if vuln.status == 'resolved' else 'info' if vuln.status == 'accepted' else 'warning' }}">{{ vuln.status }}</span></td>
+                    <td>
+                        {% if vuln.status == 'open' %}
+                        <button class="btn btn-sm btn-success" onclick="updateVulnStatus('{{ vuln.vuln_id }}', 'resolved')">Resolve</button>
+                        <button class="btn btn-sm btn-ghost" onclick="updateVulnStatus('{{ vuln.vuln_id }}', 'false_positive')">FP</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterVulns() {
+    const severity = document.getElementById('filterSeverity').value;
+    const status = document.getElementById('filterStatus').value;
+    const search = document.getElementById('filterSearch').value.toLowerCase();
+    document.querySelectorAll('#vulnTable tbody tr').forEach(row => {
+        const matchSev = !severity || row.dataset.severity === severity;
+        const matchStatus = !status || row.dataset.status === status;
+        const matchSearch = !search || row.dataset.title.includes(search);
+        row.style.display = (matchSev && matchStatus && matchSearch) ? '' : 'none';
+    });
+}
+
+function updateVulnStatus(vulnId, status) {
+    fetch(`/api/vulnerabilities/${vulnId}/status`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: status})
+    }).then(r => r.json()).then(() => location.reload())
+    .catch(err => showToast('Failed to update status', 'error'));
+}
+</script>
+{% endblock %}

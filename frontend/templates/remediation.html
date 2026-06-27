@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Remediation - VulnVision{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>Remediation</h1>
+        <span class="text-secondary">Prioritized remediation recommendations</span>
+    </div>
+    <div class="page-header-right">
+        <button class="btn btn-primary" onclick="generateRemediation()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+            Generate Remediation Plan
+        </button>
+    </div>
+</div>
+
+{% if recommendations %}
+<div class="remediation-list">
+    {% for rec in recommendations %}
+    <div class="card remediation-card" style="margin-bottom: 1rem;">
+        <div class="card-body">
+            <div class="remediation-header" style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <span class="priority-badge priority-{{ rec.priority }}">P{{ rec.priority }}</span>
+                <span class="badge badge-{{ rec.severity }}">{{ rec.severity|title }}</span>
+                <strong style="flex: 1;">{{ rec.title }}</strong>
+                <span class="text-secondary" style="font-size: 0.85rem;">CVSS {{ '%.1f'|format(rec.cvss_score or 0) }}</span>
+            </div>
+
+            <div class="remediation-meta" style="display: flex; gap: 1.5rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-secondary);">
+                <span>Category: {{ rec.category }}</span>
+                <span>Effort: <span class="badge badge-{{ 'danger' if rec.effort_estimate == 'high' else 'warning' if rec.effort_estimate == 'medium' else 'success' }}">{{ rec.effort_estimate }}</span></span>
+                <span>Risk Reduction: <strong class="text-success">{{ rec.risk_reduction }}%</strong></span>
+            </div>
+
+            <div class="remediation-fix" style="padding: 0.75rem; background: var(--bg-card); border-radius: 6px; border-left: 3px solid var(--accent-primary); margin-bottom: 0.75rem;">
+                <strong>Fix:</strong> {{ rec.fix }}
+            </div>
+
+            <details class="mitigation-details">
+                <summary style="cursor: pointer; color: var(--accent-primary); font-weight: 500; margin-bottom: 0.5rem;">Mitigation Steps ({{ rec.mitigation_steps|length }})</summary>
+                <ol style="padding-left: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    {% for step in rec.mitigation_steps %}
+                    <li style="margin-bottom: 0.35rem;">{{ step }}</li>
+                    {% endfor %}
+                </ol>
+            </details>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+            <p>No remediation recommendations available</p>
+            <p class="text-secondary">Run a scan to generate vulnerability findings and their remediation guidance.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function generateRemediation() {
+    const scanId = prompt('Enter scan ID to generate remediation for:');
+    if (!scanId) return;
+    fetch('/api/remediation/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({scan_id: parseInt(scanId)})
+    }).then(r => r.json()).then(data => {
+        showToast(`Generated ${data.total || 0} recommendations`, 'success');
+        setTimeout(() => location.reload(), 1000);
+    }).catch(() => showToast('Failed to generate remediation', 'error'));
+}
+</script>
+{% endblock %}

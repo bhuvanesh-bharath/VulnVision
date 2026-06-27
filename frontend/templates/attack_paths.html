@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Attack Paths - VulnVision{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>Attack Paths</h1>
+        <span class="text-secondary">Potential attack chains identified</span>
+    </div>
+    <div class="page-header-right">
+        <button class="btn btn-primary" onclick="generatePaths()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            Generate Attack Paths
+        </button>
+    </div>
+</div>
+
+{% if attack_paths %}
+<div class="attack-paths-grid">
+    {% for path in attack_paths %}
+    <div class="card attack-path-card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>{{ path.name }}</h3>
+            <div class="risk-gauge risk-{{ 'critical' if path.risk_score >= 9 else 'high' if path.risk_score >= 7 else 'medium' if path.risk_score >= 4 else 'low' }}">
+                {{ '%.1f'|format(path.risk_score) }}
+            </div>
+        </div>
+        <div class="card-body">
+            <p class="text-secondary" style="margin-bottom: 1rem;">{{ path.description }}</p>
+            <div class="path-meta" style="display: flex; gap: 1.5rem; margin-bottom: 1rem; font-size: 0.85rem;">
+                <div><strong>Entry:</strong> {{ path.entry_point }}</div>
+                <div><strong>Target:</strong> {{ path.target_asset }}</div>
+                <div><strong>Complexity:</strong> <span class="badge badge-{{ 'danger' if path.attack_complexity == 'high' else 'warning' if path.attack_complexity == 'medium' else 'success' }}">{{ path.attack_complexity }}</span></div>
+                <div><strong>Steps:</strong> {{ path.path_length }}</div>
+            </div>
+            <div class="attack-chain">
+                {% set steps = path.chain if path.chain else [] %}
+                {% for step in steps %}
+                <div class="chain-step">
+                    <div class="step-number">{{ loop.index }}</div>
+                    <div class="step-content">
+                        <span class="badge badge-{{ step.severity if step.severity else 'info' }}">{{ (step.severity or 'info')|title }}</span>
+                        <span class="step-ip">{{ step.host_ip }}</span>
+                        <span class="text-secondary">{{ step.description }}</span>
+                    </div>
+                </div>
+                {% if not loop.last %}
+                <div class="chain-arrow">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+            <p>No attack paths generated yet</p>
+            <p class="text-secondary">Run a scan first, then generate attack paths to identify potential attack chains.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function generatePaths() {
+    const scanId = prompt('Enter scan ID to generate attack paths for:');
+    if (!scanId) return;
+    fetch('/api/attack-paths/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({scan_id: parseInt(scanId)})
+    }).then(r => r.json()).then(data => {
+        showToast(`Generated ${data.total || 0} attack paths`, 'success');
+        setTimeout(() => location.reload(), 1000);
+    }).catch(() => showToast('Failed to generate attack paths', 'error'));
+}
+</script>
+{% endblock %}

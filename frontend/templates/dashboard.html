@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — VulnVision{% endblock %}
+
+{% block breadcrumb_current %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+    Executive Dashboard
+  </h1>
+  <div class="page-header-actions">
+    <span class="text-muted" style="font-size:0.8125rem;">
+      Last updated: <span id="lastUpdated">{{ now.strftime('%Y-%m-%d %H:%M') if now else '—' }}</span>
+    </span>
+  </div>
+</div>
+
+<!-- ===== Stat Cards ===== -->
+<div class="stat-grid">
+  <!-- Total Scans -->
+  <div class="stat-card">
+    <div class="flex-between">
+      <span class="stat-card-label">Total Scans</span>
+      <div class="stat-card-icon accent">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>
+        </svg>
+      </div>
+    </div>
+    <span class="stat-card-value">{{ stats.total_scans|default(0) }}</span>
+    <div class="stat-card-trend {{ 'up' if stats.scan_trend|default(0) >= 0 else 'down' }}">
+      {% if stats.scan_trend|default(0) >= 0 %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+      {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      {% endif %}
+      <span>{{ stats.scan_trend|default(0)|abs }}% from last period</span>
+    </div>
+  </div>
+
+  <!-- Hosts Discovered -->
+  <div class="stat-card">
+    <div class="flex-between">
+      <span class="stat-card-label">Hosts Discovered</span>
+      <div class="stat-card-icon info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+          <circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/>
+        </svg>
+      </div>
+    </div>
+    <span class="stat-card-value">{{ stats.total_hosts|default(0) }}</span>
+    <div class="stat-card-trend {{ 'up' if stats.host_trend|default(0) >= 0 else 'down' }}">
+      {% if stats.host_trend|default(0) >= 0 %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+      {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      {% endif %}
+      <span>{{ stats.host_trend|default(0)|abs }}% from last period</span>
+    </div>
+  </div>
+
+  <!-- Vulnerabilities Found -->
+  <div class="stat-card">
+    <div class="flex-between">
+      <span class="stat-card-label">Vulnerabilities Found</span>
+      <div class="stat-card-icon danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5"/>
+        </svg>
+      </div>
+    </div>
+    <span class="stat-card-value">{{ stats.total_vulnerabilities|default(0) }}</span>
+    <div class="stat-card-trend {{ 'down' if stats.vuln_trend|default(0) <= 0 else 'up' }}">
+      {% if stats.vuln_trend|default(0) >= 0 %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+      {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      {% endif %}
+      <span>{{ stats.vuln_trend|default(0)|abs }}% from last period</span>
+    </div>
+  </div>
+
+  <!-- Security Debt Score -->
+  <div class="stat-card">
+    <div class="flex-between">
+      <span class="stat-card-label">Security Debt Score</span>
+      <div class="stat-card-icon warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+        </svg>
+      </div>
+    </div>
+    <span class="stat-card-value">{{ stats.debt_score|default(0)|round(1) }}</span>
+    <div class="stat-card-trend {{ 'down' if stats.debt_trend|default(0) <= 0 else 'up' }}">
+      {% if stats.debt_trend|default(0) <= 0 %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+      {% endif %}
+      <span>{{ stats.debt_trend|default(0)|abs }}% from last period</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Severity Distribution Bar ===== -->
+<div class="card mb-3">
+  <div class="card-header">
+    <h4>Severity Distribution</h4>
+    <span class="text-muted" style="font-size:0.8125rem;">
+      {{ severity_distribution.total|default(0) }} total findings
+    </span>
+  </div>
+  <div class="card-body">
+    {% set total = severity_distribution.total|default(1) %}
+    {% set crit = severity_distribution.critical|default(0) %}
+    {% set high = severity_distribution.high|default(0) %}
+    {% set med = severity_distribution.medium|default(0) %}
+    {% set low = severity_distribution.low|default(0) %}
+    {% set info = severity_distribution.info|default(0) %}
+    <div class="stacked-bar">
+      <div class="segment critical" style="width:{{ (crit / total * 100)|round(1) }}%"></div>
+      <div class="segment high" style="width:{{ (high / total * 100)|round(1) }}%"></div>
+      <div class="segment medium" style="width:{{ (med / total * 100)|round(1) }}%"></div>
+      <div class="segment low" style="width:{{ (low / total * 100)|round(1) }}%"></div>
+      <div class="segment info-sev" style="width:{{ (info / total * 100)|round(1) }}%"></div>
+    </div>
+    <div class="stacked-legend">
+      <div class="stacked-legend-item">
+        <span class="dot" style="background:var(--severity-critical)"></span>
+        Critical <strong>{{ crit }}</strong>
+      </div>
+      <div class="stacked-legend-item">
+        <span class="dot" style="background:var(--severity-high)"></span>
+        High <strong>{{ high }}</strong>
+      </div>
+      <div class="stacked-legend-item">
+        <span class="dot" style="background:var(--severity-medium)"></span>
+        Medium <strong>{{ med }}</strong>
+      </div>
+      <div class="stacked-legend-item">
+        <span class="dot" style="background:var(--severity-low)"></span>
+        Low <strong>{{ low }}</strong>
+      </div>
+      <div class="stacked-legend-item">
+        <span class="dot" style="background:var(--severity-info)"></span>
+        Info <strong>{{ info }}</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Charts ===== -->
+<div class="chart-grid mb-3">
+  <!-- Vulnerability Trend -->
+  <div class="card">
+    <div class="card-header">
+      <h4>Vulnerability Trend</h4>
+    </div>
+    <div class="card-body">
+      <div class="chart-container">
+        <canvas id="vulnTrendChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Severity Doughnut -->
+  <div class="card">
+    <div class="card-header">
+      <h4>Severity Breakdown</h4>
+    </div>
+    <div class="card-body">
+      <div class="chart-container" style="max-width:320px;margin:0 auto;">
+        <canvas id="severityDoughnutChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Recent Scans ===== -->
+<div class="card mb-3">
+  <div class="card-header">
+    <h4>Recent Scans</h4>
+    <a href="/scans" class="btn btn-ghost btn-sm">View All</a>
+  </div>
+  <div class="table-wrapper" style="border:none;border-radius:0;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Target</th>
+          <th>Status</th>
+          <th>Hosts</th>
+          <th>Vulns</th>
+          <th>Started</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for scan in recent_scans %}
+        <tr class="row-clickable" onclick="window.location='/scans/{{ scan.scan_id }}'">
+          <td>{{ scan.name }}</td>
+          <td><code>{{ scan.target }}</code></td>
+          <td>
+            <span class="badge badge-{{ scan.status }}">{{ scan.status }}</span>
+          </td>
+          <td>{{ scan.hosts_discovered|default(0) }}</td>
+          <td>{{ scan.vulnerabilities_found|default(0) }}</td>
+          <td>{{ scan.start_time.strftime('%Y-%m-%d %H:%M') if scan.start_time else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="no-data">
+            <div class="empty-state" style="padding:32px;">
+              <p>No scans have been run yet.</p>
+              <a href="/scans" class="btn btn-primary btn-sm">Start a Scan</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== Bottom Row: Top Vulns + Activity ===== -->
+<div class="grid-2">
+  <!-- Top Vulnerabilities -->
+  <div class="card">
+    <div class="card-header">
+      <h4>Top Vulnerabilities</h4>
+      <a href="/vulnerabilities" class="btn btn-ghost btn-sm">View All</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Title</th>
+            <th>CVSS</th>
+            <th>Host</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for vuln in recent_vulnerabilities %}
+          <tr>
+            <td>
+              <span class="badge badge-{{ vuln.severity|lower }}">{{ vuln.severity }}</span>
+            </td>
+            <td>{{ vuln.title }}</td>
+            <td><strong>{{ vuln.cvss_score|default('—') }}</strong></td>
+            <td><code>{{ vuln.host.ip_address if vuln.host else '—' }}</code></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="no-data">No vulnerabilities found yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="card">
+    <div class="card-header">
+      <h4>Recent Activity</h4>
+    </div>
+    <div class="card-body">
+      <div class="activity-feed">
+        {% for activity in recent_activity %}
+        <div class="activity-item">
+          <span class="activity-dot" style="background:
+            {% if activity.action == 'scan_completed' %}var(--success)
+            {% elif activity.action == 'vulnerability_found' %}var(--danger)
+            {% elif activity.action == 'scan_started' %}var(--info)
+            {% elif activity.action == 'report_generated' %}var(--accent)
+            {% else %}var(--text-muted){% endif %};"></span>
+          <div class="activity-content">
+            <div style="color:var(--text-primary);">{{ activity.details }}</div>
+            <div class="activity-time">{{ activity.timestamp.strftime('%Y-%m-%d %H:%M') if activity.timestamp else '' }}</div>
+          </div>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:32px;">
+          <p>No recent activity to display.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart Data (injected from backend) -->
+<script>
+  window.dashboardData = {
+    severityDistribution: {
+      critical: {{ severity_distribution.critical|default(0) }},
+      high: {{ severity_distribution.high|default(0) }},
+      medium: {{ severity_distribution.medium|default(0) }},
+      low: {{ severity_distribution.low|default(0) }},
+      info: {{ severity_distribution.info|default(0) }}
+    },
+    vulnTrend: {
+      labels: {{ vuln_trend_labels|default([])|tojson }},
+      data: {{ vuln_trend_data|default([])|tojson }}
+    }
+  };
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

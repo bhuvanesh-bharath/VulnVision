@@ -1,0 +1,63 @@
+# ========================================
+# VulnVision .gitignore
+# ========================================
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# ---------- Virtual Environments ----------
+venv/
+.venv/
+env/
+ENV/
+
+# ---------- Environment / Secrets ----------
+.env
+.env.*
+*.env
+
+# ---------- Database ----------
+database/*.db
+database/*.sqlite3
+
+# ---------- Logs ----------
+logs/*.log
+logs/**/*.log
+
+# ---------- Exports / Generated Reports ----------
+exports/
+
+# ---------- Testing ----------
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# ---------- Distribution / Build ----------
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ---------- IDE / Editor ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---------- OS ----------
+desktop.ini
+ehthumbs.db
+
+# ---------- Misc ----------
+*.bak
+*.tmp
+*.log

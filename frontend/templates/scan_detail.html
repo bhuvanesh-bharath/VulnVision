@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}{{ scan.name }} — VulnVision{% endblock %}
+
+{% block breadcrumbs %}
+<a href="/dashboard">Home</a>
+<span class="separator">/</span>
+<a href="/scans">Scans</a>
+<span class="separator">/</span>
+<span class="current">{{ scan.name }}</span>
+{% endblock %}
+
+{% block content %}
+<!-- ===== Scan Header ===== -->
+<div class="scan-header">
+  <div class="scan-header-top">
+    <div class="scan-header-title">
+      <h1>{{ scan.name }}</h1>
+      <span class="badge badge-{{ scan.status }}">{{ scan.status }}</span>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-primary btn-sm" onclick="generateReport('{{ scan.scan_id }}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Generate Report
+      </button>
+    </div>
+  </div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">
+      <span class="label">Target</span>
+      <span class="value font-mono">{{ scan.target }}</span>
+    </div>
+    <div class="detail-meta-item">
+      <span class="label">Type</span>
+      <span class="value">{{ scan.scan_type|title }}</span>
+    </div>
+    <div class="detail-meta-item">
+      <span class="label">Started</span>
+      <span class="value">{{ scan.start_time.strftime('%Y-%m-%d %H:%M:%S') if scan.start_time else '—' }}</span>
+    </div>
+    <div class="detail-meta-item">
+      <span class="label">Completed</span>
+      <span class="value">{{ scan.end_time.strftime('%Y-%m-%d %H:%M:%S') if scan.end_time else '—' }}</span>
+    </div>
+    <div class="detail-meta-item">
+      <span class="label">Duration</span>
+      <span class="value">
+        {% if scan.start_time and scan.end_time %}
+          {{ ((scan.end_time - scan.start_time).total_seconds())|int // 60 }}m {{ ((scan.end_time - scan.start_time).total_seconds())|int % 60 }}s
+        {% else %}
+          —
+        {% endif %}
+      </span>
+    </div>
+  </div>
+
+  {% if scan.status == 'running' %}
+  <div style="margin-top:16px;">
+    <div class="progress-label">
+      <span>Scan Progress</span>
+      <span id="scanProgressLabel">{{ scan.progress|default(0) }}%</span>
+    </div>
+    <div class="progress-bar-wrapper lg">
+      <div class="progress-bar" id="scanProgressBar" style="width:{{ scan.progress|default(0) }}%"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if scan.error_message %}
+  <div class="alert alert-danger mt-2">
+    <span class="alert-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    </span>
+    <span>{{ scan.error_message }}</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ===== Tabs ===== -->
+<div class="tabs" id="scanTabs">
+  <button class="tab-item active" data-tab="overview">Overview</button>
+  <button class="tab-item" data-tab="hosts">Hosts ({{ hosts|length }})</button>
+  <button class="tab-item" data-tab="vulnerabilities">Vulnerabilities ({{ vulnerabilities|length }})</button>
+  <button class="tab-item" data-tab="attack-paths">Attack Paths ({{ attack_paths|length }})</button>
+  <button class="tab-item" data-tab="security-debt">Security Debt</button>
+</div>
+
+<!-- ===== Overview Tab ===== -->
+<div class="tab-content active" id="tab-overview">
+  <!-- Summary Stats -->
+  <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stat-card">
+      <span class="stat-card-label">Hosts Discovered</span>
+      <span class="stat-card-value">{{ scan.hosts_discovered|default(0) }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Vulnerabilities</span>
+      <span class="stat-card-value">{{ scan.vulnerabilities_found|default(0) }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Ports Scanned</span>
+      <span class="stat-card-value">{{ scan.ports_scanned|default(0) }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-label">Attack Paths</span>
+      <span class="stat-card-value">{{ attack_paths|length }}</span>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <!-- Severity Chart -->
+    <div class="card">
+      <div class="card-header"><h4>Severity Distribution</h4></div>
+      <div class="card-body">
+        <div class="chart-container" style="max-width:280px;margin:0 auto;">
+          <canvas id="scanSeverityChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Findings -->
+    <div class="card">
+      <div class="card-header"><h4>Top Findings</h4></div>
+      <div class="card-body" style="padding:0;">
+        <table class="data-table">
+          <thead>
+            <tr><th>Severity</th><th>Title</th><th>CVSS</th></tr>
+          </thead>
+          <tbody>
+            {% for vuln in vulnerabilities[:5] %}
+            <tr>
+              <td><span class="badge badge-{{ vuln.severity|lower }}">{{ vuln.severity }}</span></td>
+              <td>{{ vuln.title }}</td>
+              <td><strong>{{ vuln.cvss_score|default('—') }}</strong></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="no-data">No findings yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Hosts Tab ===== -->
+<div class="tab-content" id="tab-hosts">
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>IP Address</th>
+          <th>Hostname</th>
+          <th>OS</th>
+          <th>Ports</th>
+          <th>Vulnerabilities</th>
+          <th>Risk Score</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for host in hosts %}
+        <tr class="row-clickable" onclick="window.location='/hosts/{{ host.host_id }}'">
+          <td class="font-mono">{{ host.ip_address }}</td>
+          <td>{{ host.hostname|default('—') }}</td>
+          <td>{{ host.os_guess|default('Unknown') }}</td>
+          <td>{{ host.open_port_count }}</td>
+          <td>{{ host.vulnerability_count }}</td>
+          <td>
+            {% set rs = host.risk_score|default(0) %}
+            <span class="badge {% if rs >= 8 %}badge-critical{% elif rs >= 6 %}badge-high{% elif rs >= 4 %}badge-medium{% elif rs >= 2 %}badge-low{% else %}badge-info{% endif %}">
+              {{ rs|round(1) }}
+            </span>
+          </td>
+          <td><span class="badge badge-{{ 'success' if host.status == 'up' else 'neutral' }}">{{ host.status|default('unknown') }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="no-data">No hosts discovered.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== Vulnerabilities Tab ===== -->
+<div class="tab-content" id="tab-vulnerabilities">
+  <div class="filter-bar">
+    <select class="form-control" id="vulnSevFilter" onchange="filterVulnTable()" style="max-width:150px;">
+      <option value="">All Severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+      <option value="info">Info</option>
+    </select>
+    <div class="search-input-wrapper">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="form-control" id="vulnSearchInput" placeholder="Search vulnerabilities…" oninput="filterVulnTable()">
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="data-table" id="vulnTable">
+      <thead>
+        <tr>
+          <th>Severity</th>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Host</th>
+          <th>Port</th>
+          <th>CVSS</th>
+          <th>Confidence</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for vuln in vulnerabilities %}
+        <tr data-severity="{{ vuln.severity|lower }}" data-title="{{ vuln.title|lower }}">
+          <td><span class="badge badge-{{ vuln.severity|lower }}">{{ vuln.severity }}</span></td>
+          <td>{{ vuln.title }}</td>
+          <td>{{ vuln.category|default('—') }}</td>
+          <td class="font-mono">{{ vuln.host.ip_address if vuln.host else '—' }}</td>
+          <td>{{ vuln.affected_port|default('—') }}</td>
+          <td><strong>{{ vuln.cvss_score|default('—') }}</strong></td>
+          <td>{{ vuln.confidence|default('—') }}%</td>
+          <td><span class="badge badge-{{ 'success' if vuln.status == 'resolved' else 'warning' if vuln.status == 'false_positive' else 'neutral' }}">{{ vuln.status|default('open') }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="no-data">No vulnerabilities found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== Attack Paths Tab ===== -->
+<div class="tab-content" id="tab-attack-paths">
+  {% for path in attack_paths %}
+  <div class="attack-path-card">
+    <div class="attack-path-header">
+      <div>
+        <h4 style="margin-bottom:4px;">{{ path.name }}</h4>
+        <p style="font-size:0.875rem;color:var(--text-secondary);">{{ path.description }}</p>
+      </div>
+      <div class="risk-gauge" style="text-align:right;">
+        {% set ps = path.risk_score|default(0) %}
+        <span class="risk-score-large" style="font-size:1.75rem;color:{% if ps >= 8 %}var(--severity-critical){% elif ps >= 6 %}var(--severity-high){% elif ps >= 4 %}var(--severity-medium){% else %}var(--severity-low){% endif %};">
+          {{ ps|round(1) }}
+        </span>
+        <span class="risk-rating" style="font-size:0.75rem;color:var(--text-muted);">Risk Score</span>
+      </div>
+    </div>
+
+    <!-- Chain Visualization -->
+    <div class="attack-chain">
+      {% if path.chain %}
+        {% for step in path.chain %}
+        <div class="chain-step">
+          <div class="chain-node">
+            <span class="chain-number">{{ loop.index }}</span>
+            <span class="chain-label">{{ step.description|default(step.host|default('Step ' ~ loop.index)) }}</span>
+          </div>
+          {% if not loop.last %}
+          <div class="chain-arrow"></div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="detail-meta" style="margin-top:12px;">
+      <div class="detail-meta-item">
+        <span class="label">Entry Point</span>
+        <span class="value font-mono">{{ path.entry_point|default('—') }}</span>
+      </div>
+      <div class="detail-meta-item">
+        <span class="label">Target</span>
+        <span class="value font-mono">{{ path.target_asset|default('—') }}</span>
+      </div>
+      <div class="detail-meta-item">
+        <span class="label">Complexity</span>
+        <span class="value">{{ path.attack_complexity|default('—') }}</span>
+      </div>
+      <div class="detail-meta-item">
+        <span class="label">Steps</span>
+        <span class="value">{{ path.path_length|default(0) }}</span>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+    </div>
+    <h3>No Attack Paths</h3>
+    <p>Attack paths have not been generated for this scan yet.</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ===== Security Debt Tab ===== -->
+<div class="tab-content" id="tab-security-debt">
+  {% if security_debt %}
+  <div class="grid-2">
+    <!-- Score -->
+    <div class="card">
+      <div class="card-header"><h4>Debt Score</h4></div>
+      <div class="card-body text-center">
+        <div class="risk-gauge">
+          {% set ds = security_debt.debt_score|default(0) %}
+          <span class="risk-score-large" style="color:{% if ds >= 80 %}var(--severity-critical){% elif ds >= 60 %}var(--severity-high){% elif ds >= 40 %}var(--severity-medium){% else %}var(--success){% endif %};">
+            {{ ds|round(1) }}
+          </span>
+          <span class="risk-rating" style="color:{% if ds >= 80 %}var(--severity-critical){% elif ds >= 60 %}var(--severity-high){% elif ds >= 40 %}var(--severity-medium){% else %}var(--success){% endif %};">
+            {% if ds >= 80 %}Critical{% elif ds >= 60 %}High{% elif ds >= 40 %}Moderate{% else %}Low{% endif %}
+          </span>
+        </div>
+        <div class="chart-container mt-2">
+          <canvas id="debtGaugeChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Breakdown -->
+    <div class="card">
+      <div class="card-header"><h4>Debt Breakdown</h4></div>
+      <div class="card-body">
+        <div class="debt-breakdown">
+          <div class="debt-category">
+            <div class="debt-category-header">
+              <span class="debt-category-label">Vulnerability Debt</span>
+              <span class="debt-category-value">{{ security_debt.vulnerability_debt|default(0)|round(1) }}</span>
+            </div>
+            <div class="progress-bar-wrapper">
+              <div class="progress-bar danger" style="width:{{ security_debt.vulnerability_debt|default(0) }}%"></div>
+            </div>
+          </div>
+          <div class="debt-category">
+            <div class="debt-category-header">
+              <span class="debt-category-label">Legacy Service Debt</span>
+              <span class="debt-category-value">{{ security_debt.legacy_service_debt|default(0)|round(1) }}</span>
+            </div>
+            <div class="progress-bar-wrapper">
+              <div class="progress-bar warning" style="width:{{ security_debt.legacy_service_debt|default(0) }}%"></div>
+            </div>
+          </div>
+          <div class="debt-category">
+            <div class="debt-category-header">
+              <span class="debt-category-label">Exposure Debt</span>
+              <span class="debt-category-value">{{ security_debt.exposure_debt|default(0)|round(1) }}</span>
+            </div>
+            <div class="progress-bar-wrapper">
+              <div class="progress-bar" style="width:{{ security_debt.exposure_debt|default(0) }}%"></div>
+            </div>
+          </div>
+          <div class="debt-category">
+            <div class="debt-category-header">
+              <span class="debt-category-label">Configuration Debt</span>
+              <span class="debt-category-value">{{ security_debt.configuration_debt|default(0)|round(1) }}</span>
+            </div>
+            <div class="progress-bar-wrapper">
+              <div class="progress-bar success" style="width:{{ security_debt.configuration_debt|default(0) }}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    </div>
+    <h3>No Security Debt Data</h3>
+    <p>Security debt has not been calculated for this scan yet.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Chart Data -->
+<script>
+  window.scanDetailData = {
+    severity: {
+      critical: {{ severity_distribution.critical|default(0) }},
+      high: {{ severity_distribution.high|default(0) }},
+      medium: {{ severity_distribution.medium|default(0) }},
+      low: {{ severity_distribution.low|default(0) }},
+      info: {{ severity_distribution.info|default(0) }}
+    },
+    debtScore: {{ security_debt.debt_score|default(0) if security_debt else 0 }}
+  };
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Tab switching
+  const tabs = document.querySelectorAll('#scanTabs .tab-item');
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Severity doughnut
+  var sd = window.scanDetailData.severity;
+  if (sd.critical + sd.high + sd.medium + sd.low + sd.info > 0) {
+    createDoughnutChart('scanSeverityChart', {
+      labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
+      datasets: [{
+        data: [sd.critical, sd.high, sd.medium, sd.low, sd.info],
+        backgroundColor: ['#dc2626', '#ea580c', '#f59e0b', '#3b82f6', '#6b7280'],
+        borderWidth: 0
+      }]
+    });
+  }
+
+  // Debt gauge
+  if (window.scanDetailData.debtScore > 0) {
+    createGaugeChart('debtGaugeChart', window.scanDetailData.debtScore, 100);
+  }
+});
+
+// Vuln table filter
+function filterVulnTable() {
+  var sev = document.getElementById('vulnSevFilter').value.toLowerCase();
+  var search = document.getElementById('vulnSearchInput').value.toLowerCase();
+  var rows = document.querySelectorAll('#vulnTable tbody tr[data-severity]');
+  rows.forEach(function(row) {
+    var matchSev = !sev || row.dataset.severity === sev;
+    var matchSearch = !search || row.dataset.title.indexOf(search) !== -1;
+    row.style.display = (matchSev && matchSearch) ? '' : 'none';
+  });
+}
+
+// Generate report helper
+function generateReport(scanId) {
+  window.location = '/reports?scan_id=' + scanId;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Reports - VulnVision{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>Reports</h1>
+        <span class="text-secondary">Generate and manage security assessment reports</span>
+    </div>
+    <div class="page-header-right">
+        <button class="btn btn-primary" onclick="openReportModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Generate Report
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if reports %}
+        <table class="data-table" id="reportsTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Format</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                    <th>Generated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports %}
+                <tr>
+                    <td><strong>{{ report.name }}</strong></td>
+                    <td><span class="text-secondary">{{ report.report_type }}</span></td>
+                    <td><span class="badge badge-info">{{ report.format|upper }}</span></td>
+                    <td>{{ '%.1f'|format((report.file_size or 0) / 1024) }} KB</td>
+                    <td><span class="badge badge-{{ 'success' if report.status == 'completed' else 'warning' if report.status == 'generating' else 'danger' if report.status == 'failed' else 'info' }}">{{ report.status }}</span></td>
+                    <td class="text-secondary">{{ report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '-' }}</td>
+                    <td>
+                        {% if report.status == 'completed' %}
+                        <button class="btn btn-sm btn-primary" onclick="downloadReport('{{ report.report_id }}')">Download</button>
+                        {% endif %}
+                        <button class="btn btn-sm btn-danger" onclick="deleteReport('{{ report.report_id }}')">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p>No reports generated yet</p>
+            <p class="text-secondary">Generate a report from a completed scan to view it here.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Generate Report Modal -->
+<div class="modal-overlay" id="reportModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Generate Report</h3>
+            <button class="modal-close" onclick="hideModal('reportModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="reportForm">
+                <div class="form-group">
+                    <label class="form-label">Report Name</label>
+                    <input type="text" id="reportName" class="form-input" placeholder="Security Assessment Report" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Scan ID</label>
+                    <input type="number" id="reportScanId" class="form-input" placeholder="Enter scan ID" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Report Type</label>
+                    <select id="reportType" class="form-select">
+                        <option value="full">Full Report</option>
+                        <option value="executive">Executive Summary</option>
+                        <option value="technical">Technical Report</option>
+                        <option value="compliance">Compliance Report</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Format</label>
+                    <select id="reportFormat" class="form-select">
+                        <option value="pdf">PDF</option>
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="hideModal('reportModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitReport()">Generate</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openReportModal() { showModal('reportModal'); }
+
+function submitReport() {
+    const data = {
+        name: document.getElementById('reportName').value,
+        scan_id: parseInt(document.getElementById('reportScanId').value),
+        report_type: document.getElementById('reportType').value,
+        format: document.getElementById('reportFormat').value,
+        include_findings: true,
+        include_attack_paths: true,
+        include_remediation: true,
+        include_executive_summary: true
+    };
+    if (!data.name || !data.scan_id) { showToast('Please fill all required fields', 'error'); return; }
+    fetch('/api/reports/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) })
+        .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+        .then(d => { showToast('Report generated successfully', 'success'); hideModal('reportModal'); setTimeout(() => location.reload(), 1000); })
+        .catch(() => showToast('Failed to generate report', 'error'));
+}
+
+function downloadReport(reportId) {
+    window.open(`/api/reports/${reportId}/download`, '_blank');
+}
+
+function deleteReport(reportId) {
+    if (!confirm('Delete this report?')) return;
+    fetch(`/api/reports/${reportId}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(() => { showToast('Report deleted', 'success'); location.reload(); })
+        .catch(() => showToast('Failed to delete report', 'error'));
+}
+</script>
+{% endblock %}

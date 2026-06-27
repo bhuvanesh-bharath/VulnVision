@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Scans — VulnVision{% endblock %}
+
+{% block breadcrumbs %}
+<a href="/dashboard">Home</a>
+<span class="separator">/</span>
+<span class="current">Scans</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>
+    </svg>
+    Network Scans
+  </h1>
+  <div class="page-header-actions">
+    <button class="btn btn-primary" onclick="openNewScanModal()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Scan
+    </button>
+  </div>
+</div>
+
+<!-- Scans Table -->
+<div class="table-wrapper">
+  <table class="data-table" id="scansTable">
+    <thead>
+      <tr>
+        <th class="sortable">Name <span class="sort-icon">▲</span></th>
+        <th>Target</th>
+        <th>Type</th>
+        <th class="sortable">Status <span class="sort-icon">▲</span></th>
+        <th>Progress</th>
+        <th class="sortable">Hosts <span class="sort-icon">▲</span></th>
+        <th class="sortable">Vulns <span class="sort-icon">▲</span></th>
+        <th class="sortable">Started <span class="sort-icon">▲</span></th>
+        <th>Duration</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for scan in scans %}
+      <tr id="scan-row-{{ scan.scan_id }}">
+        <td>
+          <a href="/scans/{{ scan.scan_id }}" style="color:var(--text-primary);font-weight:500;">{{ scan.name }}</a>
+        </td>
+        <td><code>{{ scan.target }}</code></td>
+        <td>
+          <span class="badge badge-neutral">{{ scan.scan_type }}</span>
+        </td>
+        <td>
+          <span class="badge badge-{{ scan.status }}" id="status-{{ scan.scan_id }}">{{ scan.status }}</span>
+        </td>
+        <td style="min-width:120px;">
+          <div class="progress-bar-wrapper" id="progress-wrapper-{{ scan.scan_id }}">
+            <div class="progress-bar {{ 'success' if scan.status == 'completed' else 'danger' if scan.status == 'failed' else '' }}"
+                 id="progress-{{ scan.scan_id }}"
+                 style="width:{{ scan.progress|default(0) }}%"></div>
+          </div>
+          <span style="font-size:0.75rem;color:var(--text-muted);" id="progress-label-{{ scan.scan_id }}">{{ scan.progress|default(0) }}%</span>
+        </td>
+        <td>{{ scan.hosts_discovered|default(0) }}</td>
+        <td>{{ scan.vulnerabilities_found|default(0) }}</td>
+        <td>{{ scan.start_time.strftime('%Y-%m-%d %H:%M') if scan.start_time else '—' }}</td>
+        <td>
+          {% if scan.start_time and scan.end_time %}
+            {{ ((scan.end_time - scan.start_time).total_seconds())|int // 60 }}m {{ ((scan.end_time - scan.start_time).total_seconds())|int % 60 }}s
+          {% elif scan.status == 'running' %}
+            <span class="text-muted">In progress…</span>
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          <div class="actions-cell">
+            <a href="/scans/{{ scan.scan_id }}" class="btn btn-ghost btn-sm" data-tooltip="View">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </a>
+            <button class="btn btn-ghost btn-sm" onclick="deleteScan('{{ scan.scan_id }}')" data-tooltip="Delete" style="color:var(--danger);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="10">
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>
+                <line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <h3>No Scans Yet</h3>
+            <p>Start your first network scan to discover hosts and vulnerabilities.</p>
+            <button class="btn btn-primary" onclick="openNewScanModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Scan
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== New Scan Modal ===== -->
+<div class="modal-backdrop" id="newScanModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>New Network Scan</h3>
+      <button class="modal-close" onclick="hideModal('newScanModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="newScanForm" onsubmit="return false;">
+        <div class="form-group">
+          <label class="form-label" for="scanName">Scan Name</label>
+          <input type="text" class="form-control" id="scanName" name="name" placeholder="e.g. Production Network Audit" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="scanTarget">Target</label>
+          <input type="text" class="form-control" id="scanTarget" name="target" placeholder="e.g. 192.168.1.0/24 or 10.0.0.1" required>
+          <span class="form-hint">IP address, CIDR range, or hostname.</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="scanType">Scan Type</label>
+            <select class="form-control" id="scanType" name="scan_type">
+              <option value="quick">Quick Scan</option>
+              <option value="full" selected>Full Scan</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="scanPorts">Port Range</label>
+            <input type="text" class="form-control" id="scanPorts" name="port_range" placeholder="e.g. 1-1024 or 22,80,443">
+            <span class="form-hint">Leave blank for default ports.</span>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="hideModal('newScanModal')">Cancel</button>
+      <button class="btn btn-primary" id="submitScanBtn" onclick="submitNewScan()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Start Scan
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/scans.js') }}"></script>
+<script>
+  // Auto-refresh running scans
+  document.addEventListener('DOMContentLoaded', function() {
+    {% for scan in scans %}
+      {% if scan.status == 'running' %}
+        refreshScanStatus('{{ scan.scan_id }}');
+      {% endif %}
+    {% endfor %}
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Hosts — VulnVision{% endblock %}
+
+{% block breadcrumbs %}
+<a href="/dashboard">Home</a>
+<span class="separator">/</span>
+<span class="current">Hosts</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+      <circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/>
+    </svg>
+    Discovered Hosts
+  </h1>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <div class="search-input-wrapper">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" class="form-control" id="hostSearchInput" placeholder="Search by IP, hostname, or OS…" oninput="filterHostTable()" style="max-width:320px;">
+  </div>
+  <select class="form-control" id="hostStatusFilter" onchange="filterHostTable()" style="max-width:150px;">
+    <option value="">All Statuses</option>
+    <option value="up">Up</option>
+    <option value="down">Down</option>
+  </select>
+</div>
+
+<!-- Hosts Table -->
+<div class="table-wrapper">
+  <table class="data-table" id="hostTable">
+    <thead>
+      <tr>
+        <th class="sortable">IP Address <span class="sort-icon">▲</span></th>
+        <th>Hostname</th>
+        <th>Operating System</th>
+        <th>Status</th>
+        <th class="sortable">Open Ports <span class="sort-icon">▲</span></th>
+        <th class="sortable">Vulnerabilities <span class="sort-icon">▲</span></th>
+        <th class="sortable">Risk Score <span class="sort-icon">▲</span></th>
+        <th class="sortable">Last Seen <span class="sort-icon">▲</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for host in hosts %}
+      <tr class="row-clickable" onclick="window.location='/hosts/{{ host.host_id }}'"
+          data-search="{{ host.ip_address|lower }} {{ (host.hostname or '')|lower }} {{ (host.os_guess or '')|lower }}"
+          data-status="{{ host.status|default('unknown')|lower }}">
+        <td class="font-mono">{{ host.ip_address }}</td>
+        <td>{{ host.hostname|default('—') }}</td>
+        <td>{{ host.os_guess|default('Unknown') }}</td>
+        <td>
+          <span class="badge badge-{{ 'success' if host.status == 'up' else 'neutral' }}">{{ host.status|default('unknown') }}</span>
+        </td>
+        <td>{{ host.open_port_count }}</td>
+        <td>{{ host.vulnerability_count }}</td>
+        <td>
+          {% set rs = host.risk_score|default(0) %}
+          <span class="badge {% if rs >= 8 %}badge-critical{% elif rs >= 6 %}badge-high{% elif rs >= 4 %}badge-medium{% elif rs >= 2 %}badge-low{% else %}badge-info{% endif %}">
+            {{ rs|round(1) }}
+          </span>
+        </td>
+        <td>{{ host.last_seen.strftime('%Y-%m-%d %H:%M') if host.last_seen else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="8">
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+                <circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/>
+              </svg>
+            </div>
+            <h3>No Hosts Discovered</h3>
+            <p>Run a network scan to discover hosts on your target network.</p>
+            <a href="/scans" class="btn btn-primary btn-sm">Go to Scans</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterHostTable() {
+  var search = document.getElementById('hostSearchInput').value.toLowerCase();
+  var status = document.getElementById('hostStatusFilter').value.toLowerCase();
+  var rows = document.querySelectorAll('#hostTable tbody tr[data-search]');
+  rows.forEach(function(row) {
+    var matchSearch = !search || row.dataset.search.indexOf(search) !== -1;
+    var matchStatus = !status || row.dataset.status === status;
+    row.style.display = (matchSearch && matchStatus) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

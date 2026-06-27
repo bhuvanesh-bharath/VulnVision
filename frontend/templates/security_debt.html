@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Security Debt - VulnVision{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>Security Debt</h1>
+        <span class="text-secondary">Accumulated security risk over time</span>
+    </div>
+</div>
+
+{% if latest_debt %}
+<div class="stat-cards">
+    <div class="stat-card stat-card-large">
+        <div class="stat-value {% if latest_debt.debt_score >= 60 %}text-danger{% elif latest_debt.debt_score >= 30 %}text-warning{% else %}text-success{% endif %}" style="font-size: 3rem;">
+            {{ '%.1f'|format(latest_debt.debt_score) }}
+        </div>
+        <div class="stat-label">Overall Debt Score</div>
+        <div class="stat-trend">
+            {% if latest_debt.trend == 'degrading' %}
+            <span class="text-danger">↑ Degrading by {{ '%.1f'|format(latest_debt.trend_percentage|abs) }}%</span>
+            {% elif latest_debt.trend == 'improving' %}
+            <span class="text-success">↓ Improving by {{ '%.1f'|format(latest_debt.trend_percentage|abs) }}%</span>
+            {% else %}
+            <span class="text-secondary">→ Stable</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="grid-2col" style="margin-top: 1.5rem;">
+    <div class="card">
+        <div class="card-header"><h3>Debt Breakdown</h3></div>
+        <div class="card-body">
+            <div class="debt-breakdown">
+                <div class="debt-item">
+                    <div class="debt-label"><span>Vulnerability Debt</span><span>{{ '%.0f'|format(latest_debt.vulnerability_debt) }}%</span></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: {{ latest_debt.vulnerability_debt }}%; background: var(--danger);"></div></div>
+                </div>
+                <div class="debt-item">
+                    <div class="debt-label"><span>Legacy Service Debt</span><span>{{ '%.0f'|format(latest_debt.legacy_service_debt) }}%</span></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: {{ latest_debt.legacy_service_debt }}%; background: var(--warning);"></div></div>
+                </div>
+                <div class="debt-item">
+                    <div class="debt-label"><span>Exposure Debt</span><span>{{ '%.0f'|format(latest_debt.exposure_debt) }}%</span></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: {{ latest_debt.exposure_debt }}%; background: var(--accent-primary);"></div></div>
+                </div>
+                <div class="debt-item">
+                    <div class="debt-label"><span>Configuration Debt</span><span>{{ '%.0f'|format(latest_debt.configuration_debt) }}%</span></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: {{ latest_debt.configuration_debt }}%; background: var(--info);"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Debt History</h3></div>
+        <div class="card-body">
+            {% if debt_history|length > 1 %}
+            <canvas id="debtTrendChart" height="250"></canvas>
+            {% else %}
+            <div class="empty-state"><p class="text-secondary">Not enough data for trend chart. Run more scans.</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if latest_debt.recommendations %}
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header"><h3>Recommendations</h3></div>
+    <div class="card-body">
+        {% for rec in latest_debt.recommendations %}
+        <div class="recommendation-item" style="padding: 1rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span class="badge badge-{{ 'danger' if rec.priority == 'critical' or rec.priority == 1 else 'warning' if rec.priority == 'high' or rec.priority == 2 else 'info' }}">
+                    {% if rec.priority is number %}P{{ rec.priority }}{% else %}{{ rec.priority|title }}{% endif %}
+                </span>
+                <strong>{{ rec.title or rec.action or 'Recommendation' }}</strong>
+                {% if rec.impact %}
+                <span class="badge badge-{{ rec.impact }}">{{ rec.impact }} impact</span>
+                {% endif %}
+            </div>
+            {% if rec.description %}
+            <p class="text-secondary" style="margin-top: 0.5rem; font-size: 0.9rem;">{{ rec.description }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <p>No security debt data available</p>
+            <p class="text-secondary">Security debt is calculated automatically after scan completion.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if debt_history and debt_history|length > 1 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+const labels = [{% for d in debt_history|reverse %}'{{ d.calculated_at.strftime("%m/%d") }}'{% if not loop.last %},{% endif %}{% endfor %}];
+const scores = [{% for d in debt_history|reverse %}{{ d.debt_score }}{% if not loop.last %},{% endif %}{% endfor %}];
+if (labels.length > 1) {
+    new Chart(document.getElementById('debtTrendChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Debt Score', data: scores,
+                borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)',
+                fill: true, tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: '#e2e8f0' } } },
+            scales: {
+                x: { ticks: { color: '#94a3b8' }, grid: { color: '#2d3148' } },
+                y: { ticks: { color: '#94a3b8' }, grid: { color: '#2d3148' }, min: 0, max: 100 }
+            }
+        }
+    });
+}
+</script>
+{% endif %}
+{% endblock %}
