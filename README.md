@@ -223,6 +223,9 @@ Configuration is managed via environment variables:
 | `REPORT_COMPANY` | `VulnVision Security` | Company name for reports |
 
 ---
+## Note
+
+This project is under active development. Some features may be incomplete or behave unexpectedly, and bugs may be present. Feedback and contributions are welcome.
 
 ## License
 
